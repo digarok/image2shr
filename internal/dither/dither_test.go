@@ -84,33 +84,60 @@ func TestNearestIsPerceptual(t *testing.T) {
 	}
 }
 
-func TestFloydSteinbergPreservesMeanLevel(t *testing.T) {
+func TestDitherPreservesMeanLevel(t *testing.T) {
 	// A flat image exactly between grey levels 7 and 8 (in linear light)
 	// must dither to a mix of 7s and 8s whose mean linear value stays close
-	// to the input — the whole point of error diffusion.
+	// to the input — the whole point of dithering. Atkinson deliberately
+	// drops a quarter of the error, so its tolerance is looser.
 	l7 := pix.SRGBToLinear(7.0 / 15)
 	l8 := pix.SRGBToLinear(8.0 / 15)
 	target := (l7 + l8) / 2
 
-	d, _ := pipeline.LookupDitherer("floyd-steinberg")
-	out, err := d.Apply(flat(target), greyPlan(), pipeline.DefaultOptions())
-	if err != nil {
-		t.Fatal(err)
-	}
-	var sum float64
-	for _, idx := range out.Pix {
-		if idx != 7 && idx != 8 {
-			t.Fatalf("unexpected index %d, want only 7 or 8", idx)
+	for _, tt := range []struct {
+		name string
+		tol  float64
+	}{
+		{"floyd-steinberg", 0.005},
+		{"jarvis", 0.005},
+		{"sierra", 0.005},
+		{"atkinson", 0.02},
+		{"bayer2", 0.02},
+		{"bayer4", 0.02},
+		{"bayer8", 0.02},
+	} {
+		d, err := pipeline.LookupDitherer(tt.name)
+		if err != nil {
+			t.Fatal(err)
 		}
-		sum += float64(pix.SRGBToLinear(float32(idx) / 15))
-	}
-	mean := sum / float64(len(out.Pix))
-	if math.Abs(mean-float64(target)) > 0.005 {
-		t.Errorf("mean linear level = %v, want ~%v", mean, target)
+		out, err := d.Apply(flat(target), greyPlan(), pipeline.DefaultOptions())
+		if err != nil {
+			t.Fatal(err)
+		}
+		var sum float64
+		seen := map[uint8]int{}
+		for _, idx := range out.Pix {
+			if idx != 7 && idx != 8 {
+				t.Fatalf("%s: unexpected index %d, want only 7 or 8", tt.name, idx)
+			}
+			seen[idx]++
+			sum += float64(pix.SRGBToLinear(float32(idx) / 15))
+		}
+		if len(seen) != 2 {
+			t.Errorf("%s: output uses only index %v — not dithering", tt.name, seen)
+		}
+		mean := sum / float64(len(out.Pix))
+		if math.Abs(mean-float64(target)) > tt.tol {
+			t.Errorf("%s: mean linear level = %v, want ~%v", tt.name, mean, target)
+		}
 	}
 }
 
-func TestFloydSteinbergDeterministic(t *testing.T) {
+var allDithers = []string{
+	"none", "floyd-steinberg", "atkinson", "jarvis", "sierra",
+	"bayer2", "bayer4", "bayer8",
+}
+
+func TestDitherDeterministic(t *testing.T) {
 	img := pix.New(shr.Width320, shr.Height)
 	for y := 0; y < img.H; y++ {
 		for x := 0; x < img.W; x++ {
@@ -120,21 +147,26 @@ func TestFloydSteinbergDeterministic(t *testing.T) {
 	}
 	opt := pipeline.DefaultOptions()
 	opt.Serpentine = true
-	d, _ := pipeline.LookupDitherer("floyd-steinberg")
-	a, err := d.Apply(img, greyPlan(), opt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	b, err := d.Apply(img, greyPlan(), opt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(a.Pix, b.Pix) {
-		t.Error("same input produced different dither output")
+	for _, name := range allDithers {
+		d, err := pipeline.LookupDitherer(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		a, err := d.Apply(img, greyPlan(), opt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		b, err := d.Apply(img, greyPlan(), opt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(a.Pix, b.Pix) {
+			t.Errorf("%s: same input produced different dither output", name)
+		}
 	}
 }
 
-func TestFloydSteinbergStrengthZeroEqualsNone(t *testing.T) {
+func TestDitherStrengthZeroEqualsNone(t *testing.T) {
 	img := pix.New(shr.Width320, shr.Height)
 	for y := 0; y < img.H; y++ {
 		for x := 0; x < img.W; x++ {
@@ -144,30 +176,57 @@ func TestFloydSteinbergStrengthZeroEqualsNone(t *testing.T) {
 	}
 	opt := pipeline.DefaultOptions()
 	opt.DitherStrength = 0
-	fs, _ := pipeline.LookupDitherer("floyd-steinberg")
 	nn, _ := pipeline.LookupDitherer("none")
-	a, err := fs.Apply(img, greyPlan(), opt)
+	want, err := nn.Apply(img, greyPlan(), opt)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, err := nn.Apply(img, greyPlan(), opt)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !reflect.DeepEqual(a.Pix, b.Pix) {
-		t.Error("floyd-steinberg with strength 0 should equal nearest-color")
+	for _, name := range allDithers[1:] {
+		d, _ := pipeline.LookupDitherer(name)
+		got, err := d.Apply(img, greyPlan(), opt)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(got.Pix, want.Pix) {
+			t.Errorf("%s with strength 0 should equal nearest-color", name)
+		}
 	}
 }
 
-func TestStubsReturnNotImplemented(t *testing.T) {
-	for _, name := range []string{"atkinson", "jarvis", "sierra", "bayer2", "bayer4", "bayer8"} {
-		d, err := pipeline.LookupDitherer(name)
+// TestBayerMatrix pins the recursive construction against the well-known
+// 4×4 index matrix.
+func TestBayerMatrix(t *testing.T) {
+	want := [][]int{
+		{0, 8, 2, 10},
+		{12, 4, 14, 6},
+		{3, 11, 1, 9},
+		{15, 7, 13, 5},
+	}
+	if got := bayerMatrix(4); !reflect.DeepEqual(got, want) {
+		t.Errorf("bayerMatrix(4) = %v, want %v", got, want)
+	}
+}
+
+// TestBayerTiles: ordered dithering has no inter-pixel state, so a flat
+// input must produce an exact n×n repeating tile.
+func TestBayerTiles(t *testing.T) {
+	l7 := pix.SRGBToLinear(7.0 / 15)
+	l8 := pix.SRGBToLinear(8.0 / 15)
+	for _, tt := range []struct {
+		name string
+		n    int
+	}{{"bayer2", 2}, {"bayer4", 4}, {"bayer8", 8}} {
+		d, _ := pipeline.LookupDitherer(tt.name)
+		out, err := d.Apply(flat((l7+l8)/2), greyPlan(), pipeline.DefaultOptions())
 		if err != nil {
-			t.Fatalf("stub %q not registered: %v", name, err)
+			t.Fatal(err)
 		}
-		_, err = d.Apply(flat(0), greyPlan(), pipeline.DefaultOptions())
-		if !errors.Is(err, pipeline.ErrNotImplemented) {
-			t.Errorf("stub %q: err = %v, want ErrNotImplemented", name, err)
+		for y := 0; y < out.H; y++ {
+			for x := 0; x < out.W; x++ {
+				if out.Pix[y*out.W+x] != out.Pix[(y%tt.n)*out.W+x%tt.n] {
+					t.Fatalf("%s: pixel (%d,%d) breaks the %dx%d tile", tt.name, x, y, tt.n, tt.n)
+				}
+			}
 		}
 	}
 }

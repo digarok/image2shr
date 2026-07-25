@@ -1,6 +1,7 @@
-// Package dither holds Ditherer implementations. Working: none (nearest
-// color) and floyd-steinberg. The other names from the CLI are registered
-// stubs so the flag parses today (see stubs.go).
+// Package dither holds Ditherer implementations: none (nearest color),
+// the error diffusers floyd-steinberg / atkinson / jarvis / sierra (shared
+// engine in errordiffusion.go, one kernel per file), and ordered bayer2/4/8
+// (bayer.go).
 //
 // Palette matching is perceptual, error accounting is physical: nearest
 // means smallest squared Euclidean distance in Oklab, while error vectors

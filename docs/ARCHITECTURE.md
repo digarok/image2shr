@@ -45,7 +45,7 @@ touching neighbors.
 | `internal/prepare` | Crop, aspect-aware box resampler, tone adjustments. |
 | `internal/pipeline` | The seams: `Options`, `Plan`, `Indexed`, the three interfaces, registries, `Run`/`PackFrame` glue. |
 | `internal/planner` | `PalettePlanner` implementations: `Fixed`, `AdaptiveColor16`, `AdaptiveColor256` (multi-SCB: banded / adaptive-grouped / per-line strategies via `--scb-mode`), `AdaptiveColor3200` (one palette per scanline, Brooks). |
-| `internal/dither` | `Ditherer` implementations (v1: `none`, `floyd-steinberg`; stubs for the rest). |
+| `internal/dither` | `Ditherer` implementations: `none`, error diffusion (`floyd-steinberg`, `atkinson`, `jarvis`, `sierra` — shared engine, one kernel per file), ordered (`bayer2/4/8`). |
 | `internal/target` | `Target` implementations (v1: `shr320-grey16`). |
 | `internal/writer` | Output containers + ProDOS type/auxtype + sidecar. |
 | `internal/cli` | Subcommands, flag parsing, stdout/stderr discipline, exit codes, `--json`. |
@@ -79,8 +79,9 @@ entirely custom that returns a `*shr.Frame`.
 
 **New ditherer** — one file in `internal/dither/`. Implement
 `pipeline.Ditherer` over a `LinearImage` + `Plan`, register in `init()`; the
-CLI flag value is the `Name()`. Replace the corresponding stub in
-`stubs.go`. 640-mode dithering must choose 2-bit values whose meaning
+CLI flag value is the `Name()`. A new error-diffusion kernel is just a
+`diffuser{name, kernel}` registration (see `errordiffusion.go`). 640-mode
+dithering must choose 2-bit values whose meaning
 depends on x (via `shr.PaletteIndex640`) — currently rejected as
 not-implemented in `check320`.
 

@@ -104,15 +104,17 @@ func TestConvertUsageErrors(t *testing.T) {
 	}
 }
 
-func TestConvertStubDitherIsRuntimeError(t *testing.T) {
+func TestConvertEveryDither(t *testing.T) {
 	in := testPNG(t)
-	out := filepath.Join(t.TempDir(), "out.shr")
-	code, _, stderr := run(t, nil, "convert", "--dither", "atkinson", "-o", out, in)
-	if code != 1 {
-		t.Errorf("exit %d, want 1 (stub algorithm is a runtime failure)", code)
-	}
-	if !strings.Contains(string(stderr), "not yet implemented") {
-		t.Errorf("stderr %q should mention not yet implemented", stderr)
+	for _, name := range []string{
+		"none", "floyd-steinberg", "atkinson", "jarvis", "sierra",
+		"bayer2", "bayer4", "bayer8",
+	} {
+		out := filepath.Join(t.TempDir(), "out.shr")
+		code, _, stderr := run(t, nil, "convert", "--dither", name, "-o", out, in)
+		if code != 0 {
+			t.Errorf("--dither %s: exit %d, stderr: %s", name, code, stderr)
+		}
 	}
 }
 
