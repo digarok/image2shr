@@ -16,23 +16,30 @@ const previewUsage = `Render an SHR file to PNG exactly as the IIgs would displa
 Usage:
   image2shr preview [flags] <file.shr>
 
-Only uncompressed 32768-byte screens are supported so far. The canvas is
-640x200 (320-mode pixels are two canvas pixels wide); SHR pixels are not
-square, so pass --scale to enlarge for viewing. The input "-" reads stdin.
+The canvas is 320x200 when every scanline is in 320 mode. If any scanline
+uses 640 mode the canvas must be 640x400: 640-mode pixels need the full
+horizontal resolution, and every scanline is doubled vertically to keep the
+pixel shape. --size 640 forces the 640x400 canvas for an all-320-mode image
+(each pixel becomes a 2x2 block); --size 320 fails if the image contains
+640-mode scanlines. --scale enlarges the chosen canvas further.
+
+Only uncompressed 32768-byte screens are supported so far. The input "-"
+reads stdin.
 
 Examples:
   image2shr preview title.shr -o title.png
-  image2shr preview --scale 2 title.shr -o big.png
+  image2shr preview title.shr -o big.png --size 640 --scale 2
   image2shr preview title.shr -o - > out.png
 `
 
 func cmdPreview(e *env, args []string) error {
 	fs := newFlagSet(e, "preview", previewUsage)
-	var output string
+	var output, size string
 	var scale int
 	fs.StringVar(&output, "output", "", "output PNG path, \"-\" for stdout (required)")
 	fs.StringVar(&output, "o", "", "alias for --output")
-	fs.IntVar(&scale, "scale", 1, "integer scale factor for the 640x200 canvas")
+	fs.StringVar(&size, "size", "auto", "canvas size: auto, 320 (320x200), or 640 (640x400)")
+	fs.IntVar(&scale, "scale", 1, "integer scale factor for the chosen canvas")
 
 	pos, err := parse(fs, args)
 	if err != nil {
@@ -44,6 +51,11 @@ func cmdPreview(e *env, args []string) error {
 	if output == "" {
 		return usagef("preview requires -o / --output")
 	}
+	switch size {
+	case "auto", "320", "320x200", "640", "640x400":
+	default:
+		return usagef("--size %q: must be auto, 320 (or 320x200), or 640 (or 640x400)", size)
+	}
 	if scale < 1 || scale > 16 {
 		return usagef("--scale %d out of range 1-16", scale)
 	}
@@ -53,7 +65,17 @@ func cmdPreview(e *env, args []string) error {
 		return err
 	}
 
-	img := shr.Render(frame)
+	var img *image.RGBA
+	switch size {
+	case "320", "320x200":
+		if img, err = shr.Render320(frame); err != nil {
+			return fmt.Errorf("%s uses 640 mode and requires a 640x400 preview (drop --size 320 or pass --size 640): %w", pos[0], err)
+		}
+	case "640", "640x400":
+		img = shr.Render640(frame)
+	default: // auto: 320x200 unless any scanline needs 640 mode
+		img = shr.Render(frame)
+	}
 	out := image.Image(img)
 	if scale > 1 {
 		out = scaleNearest(img, scale)

@@ -25,22 +25,18 @@ func TestRender320(t *testing.T) {
 	f.Pixels[BytesPerLine] = 0x50
 
 	img := Render(f)
-	if img.Bounds().Dx() != 640 || img.Bounds().Dy() != 200 {
-		t.Fatalf("canvas = %v, want 640x200", img.Bounds())
+	if img.Bounds().Dx() != 320 || img.Bounds().Dy() != 200 {
+		t.Fatalf("canvas = %v, want 320x200 for an all-320-mode frame", img.Bounds())
 	}
 	red := color.RGBA{0xFF, 0, 0, 0xFF}
 	green := color.RGBA{0, 0xFF, 0, 0xFF}
 	black := color.RGBA{0, 0, 0, 0xFF}
 
-	// 320-mode pixel 0 is doubled onto canvas x=0 and x=1.
 	if got := pixelAt(t, img, 0, 0); got != red {
 		t.Errorf("(0,0) = %v, want red", got)
 	}
-	if got := pixelAt(t, img, 1, 0); got != red {
-		t.Errorf("(1,0) = %v, want red (320 pixels are doubled)", got)
-	}
-	if got := pixelAt(t, img, 2, 0); got != black {
-		t.Errorf("(2,0) = %v, want black", got)
+	if got := pixelAt(t, img, 1, 0); got != black {
+		t.Errorf("(1,0) = %v, want black", got)
 	}
 	// Line 1 uses palette 3 via its SCB.
 	if got := pixelAt(t, img, 0, 1); got != green {
@@ -63,6 +59,9 @@ func TestRender640PositionMapping(t *testing.T) {
 	f.Pixels[0] = 0x55
 
 	img := Render(f)
+	if img.Bounds().Dx() != 640 || img.Bounds().Dy() != 400 {
+		t.Fatalf("canvas = %v, want 640x400 for a frame with 640-mode lines", img.Bounds())
+	}
 	want := []color.RGBA{
 		{0xFF, 0, 0, 0xFF},
 		{0, 0xFF, 0, 0xFF},
@@ -72,6 +71,10 @@ func TestRender640PositionMapping(t *testing.T) {
 	for x, w := range want {
 		if got := pixelAt(t, img, x, 0); got != w {
 			t.Errorf("640 pixel x=%d = %v, want %v (position→group mapping)", x, got, w)
+		}
+		// Scanline 0 is doubled onto canvas rows 0 and 1.
+		if got := pixelAt(t, img, x, 1); got != w {
+			t.Errorf("640 pixel x=%d row 1 = %v, want %v (scanline doubling)", x, got, w)
 		}
 	}
 }
@@ -91,14 +94,68 @@ func TestRenderFillMode(t *testing.T) {
 	blue := color.RGBA{0, 0, 0xFF, 0xFF}
 
 	// Fill line: value 0 after the red pixel repeats red.
-	if got := pixelAt(t, img, 2, 0); got != red {
+	if got := pixelAt(t, img, 1, 0); got != red {
 		t.Errorf("fill line pixel 1 = %v, want red (0 repeats previous color)", got)
 	}
-	if got := pixelAt(t, img, 6, 0); got != red {
+	if got := pixelAt(t, img, 3, 0); got != red {
 		t.Errorf("fill line pixel 3 = %v, want red (fill keeps repeating)", got)
 	}
 	// Non-fill line: value 0 is palette entry 0 (blue).
-	if got := pixelAt(t, img, 2, 1); got != blue {
+	if got := pixelAt(t, img, 1, 1); got != blue {
 		t.Errorf("non-fill line pixel 1 = %v, want blue (palette entry 0)", got)
+	}
+}
+
+// TestRender640Doubling pins how each mode maps onto the 640×400 canvas:
+// 320-mode pixels become 2×2 canvas blocks, and a mixed-mode frame renders
+// both kinds of line on one canvas.
+func TestRender640Doubling(t *testing.T) {
+	f := &Frame{}
+	f.Palettes[0][5] = RGB12{15, 0, 0}
+	f.Palettes[0][9] = RGB12{0, 15, 0} // 640 group for value 1 at position 0
+	f.SCB[1] = MakeSCB(true, false, false, 0)
+	f.Pixels[0] = 0x50            // line 0 (320 mode): pixel 0 = index 5
+	f.Pixels[BytesPerLine] = 0x40 // line 1 (640 mode): pixel 0 = value 1
+
+	img := Render640(f)
+	if img.Bounds().Dx() != 640 || img.Bounds().Dy() != 400 {
+		t.Fatalf("canvas = %v, want 640x400", img.Bounds())
+	}
+	red := color.RGBA{0xFF, 0, 0, 0xFF}
+	green := color.RGBA{0, 0xFF, 0, 0xFF}
+	black := color.RGBA{0, 0, 0, 0xFF}
+
+	// 320-mode pixel 0 covers canvas (0,0)-(1,1).
+	for _, p := range [][2]int{{0, 0}, {1, 0}, {0, 1}, {1, 1}} {
+		if got := pixelAt(t, img, p[0], p[1]); got != red {
+			t.Errorf("(%d,%d) = %v, want red (320 pixel → 2x2 block)", p[0], p[1], got)
+		}
+	}
+	if got := pixelAt(t, img, 2, 0); got != black {
+		t.Errorf("(2,0) = %v, want black", got)
+	}
+	// 640-mode scanline 1 lands on canvas rows 2 and 3, one pixel wide.
+	if got := pixelAt(t, img, 0, 2); got != green {
+		t.Errorf("(0,2) = %v, want green (640 line on canvas row 2)", got)
+	}
+	if got := pixelAt(t, img, 0, 3); got != green {
+		t.Errorf("(0,3) = %v, want green (scanline doubling)", got)
+	}
+	if got := pixelAt(t, img, 1, 2); got == green {
+		t.Error("(1,2) must not repeat the 640-mode pixel horizontally")
+	}
+}
+
+func TestRender320Rejects640(t *testing.T) {
+	f := &Frame{}
+	f.SCB[42] = SCBMode640
+	if _, err := Render320(f); err == nil {
+		t.Error("Render320 must fail when a scanline uses 640 mode")
+	}
+	if !f.Uses640() {
+		t.Error("Uses640 = false, want true")
+	}
+	if (&Frame{}).Uses640() {
+		t.Error("Uses640 on an all-320 frame = true, want false")
 	}
 }

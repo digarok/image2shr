@@ -226,17 +226,23 @@ func TestConvertSidecarAndPreviewPNG(t *testing.T) {
 	if !strings.Contains(string(side), `"$C1"`) {
 		t.Errorf("sidecar missing file type: %s", side)
 	}
-	pf, err := os.Open(prev)
+	checkPNGSize(t, prev, 320, 200)
+}
+
+// checkPNGSize decodes a PNG file and asserts its pixel dimensions.
+func checkPNGSize(t *testing.T, path string, w, h int) {
+	t.Helper()
+	f, err := os.Open(path)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer pf.Close()
-	img, err := png.Decode(pf)
+	defer f.Close()
+	img, err := png.Decode(f)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if img.Bounds().Dx() != 640 || img.Bounds().Dy() != 200 {
-		t.Errorf("preview PNG = %v, want 640x200", img.Bounds())
+	if img.Bounds().Dx() != w || img.Bounds().Dy() != h {
+		t.Errorf("%s = %v, want %dx%d", filepath.Base(path), img.Bounds(), w, h)
 	}
 }
 
@@ -305,6 +311,61 @@ func TestFlagsAfterPositional(t *testing.T) {
 	}
 	if _, err := os.Stat(pngOut); err != nil {
 		t.Fatal(err)
+	}
+}
+
+// TestPreviewSizes pins the canvas rules: 320x200 for all-320-mode images,
+// 640x400 when forced or when any scanline uses 640 mode, and a runtime
+// error when a 640-mode image is forced down to 320.
+func TestPreviewSizes(t *testing.T) {
+	in := testPNG(t)
+	dir := t.TempDir()
+	out := filepath.Join(dir, "out.shr")
+	if code, _, stderr := run(t, nil, "convert", "-o", out, in); code != 0 {
+		t.Fatalf("convert failed: %s", stderr)
+	}
+
+	// Default: an all-320-mode image renders at 320x200.
+	small := filepath.Join(dir, "small.png")
+	if code, _, stderr := run(t, nil, "preview", out, "-o", small); code != 0 {
+		t.Fatalf("preview exit %d: %s", code, stderr)
+	}
+	checkPNGSize(t, small, 320, 200)
+
+	// --size 640 doubles it in both dimensions.
+	big := filepath.Join(dir, "big.png")
+	if code, _, stderr := run(t, nil, "preview", out, "-o", big, "--size", "640"); code != 0 {
+		t.Fatalf("preview --size 640 exit %d: %s", code, stderr)
+	}
+	checkPNGSize(t, big, 640, 400)
+
+	// A frame with 640-mode scanlines auto-selects the 640x400 canvas...
+	f := &shr.Frame{}
+	for y := range f.SCB {
+		f.SCB[y] = shr.SCBMode640
+	}
+	shr640 := filepath.Join(dir, "mode640.shr")
+	if err := os.WriteFile(shr640, f.EncodeRaw(), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	auto := filepath.Join(dir, "auto.png")
+	if code, _, stderr := run(t, nil, "preview", shr640, "-o", auto); code != 0 {
+		t.Fatalf("preview of 640-mode frame exit %d: %s", code, stderr)
+	}
+	checkPNGSize(t, auto, 640, 400)
+
+	// ...and refuses --size 320 with a runtime error naming 640 mode.
+	code, _, stderr := run(t, nil, "preview", shr640, "-o", "-", "--size", "320")
+	if code != 1 {
+		t.Errorf("--size 320 on 640-mode file: exit %d, want 1 (stderr: %s)", code, stderr)
+	}
+	if !strings.Contains(string(stderr), "640") {
+		t.Errorf("stderr should say the file requires 640 mode: %s", stderr)
+	}
+
+	// An unknown size value is a usage error.
+	if code, _, _ := run(t, nil, "preview", shr640, "-o", "-", "--size", "800"); code != 2 {
+		t.Errorf("--size 800: exit %d, want 2", code)
 	}
 }
 

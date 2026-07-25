@@ -36,7 +36,7 @@ image2shr convert -o title.shr -t shr320-grey16 \
 
 # See what the IIgs will display, before ever leaving your desk:
 image2shr preview title.shr -o check.png
-image2shr preview --scale 2 title.shr -o big.png
+image2shr preview title.shr -o big.png --size 640 --scale 2
 
 # Or get the preview in the same run:
 image2shr convert --preview-png check.png -o title.shr title.jpg

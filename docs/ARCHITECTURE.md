@@ -63,9 +63,12 @@ touching neighbors.
   inspect. Never reimplement it.
 - Color fill mode (320 only, SCB bit 5): pixel value 0 repeats the previous
   color. The renderer honors it; no v1 target emits it.
-- `shr.Render` is the correctness anchor: 640×200 canvas, 320-mode pixels
-  drawn 2 wide, per-line mode/palette/fill honored. Golden tests compare
-  against its output.
+- `shr.Render` is the correctness anchor: per-line mode/palette/fill honored,
+  640-mode pixels resolved through `PaletteIndex640`. The canvas is 320×200
+  when every scanline is in 320 mode; any 640-mode scanline forces 640×400
+  (scanlines doubled vertically, 320-mode pixels doubled horizontally).
+  `Render320`/`Render640` force a canvas — `Render320` errors on frames with
+  640-mode lines. Golden tests compare against this output.
 
 ## Extension points
 
