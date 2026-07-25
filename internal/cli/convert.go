@@ -32,6 +32,7 @@ input with the extension replaced by .shr (stdin input requires -o).
 Examples:
   image2shr convert photo.png
   image2shr convert -o title.shr -t shr320-grey16 --dither floyd-steinberg title.jpg
+  image2shr convert -o title.shr -t shr320-color256 --scb-mode per-line title.jpg
   image2shr convert --dither none --fit cover --aspect ignore -o out.shr in.bmp
   image2shr convert --preview-png check.png --sidecar -o out.shr in.png
   image2shr convert --json -o out.shr in.png       # machine-readable report on stdout
@@ -65,7 +66,7 @@ func cmdConvert(e *env, args []string) error {
 	fs.StringVar(&cfg.Opt.Dither, "dither", def.Dither, "none, floyd-steinberg, atkinson, jarvis, sierra, bayer2/4/8")
 	fs.Float64Var(&cfg.Opt.DitherStrength, "dither-strength", def.DitherStrength, "error diffusion strength, 0.0-1.0")
 	fs.BoolVar(&cfg.Opt.Serpentine, "serpentine", false, "serpentine scan for error diffusion")
-	fs.StringVar(&cfg.Opt.SCBMode, "scb-mode", def.SCBMode, "single, per-line, grouped")
+	fs.StringVar(&cfg.Opt.SCBMode, "scb-mode", def.SCBMode, "auto, single, banded, grouped, per-line")
 	fs.StringVar(&cfg.Opt.Palette, "palette", "", "named builtin or a palette file")
 	fs.StringVar(&cfg.Opt.Fit, "fit", def.Fit, "contain, cover, stretch, none")
 	fs.StringVar(&cfg.Opt.Aspect, "aspect", def.Aspect, "correct, ignore")
@@ -123,9 +124,9 @@ func validateConvert(cfg *convertConfig) error {
 		return usagef("--dither-strength %v out of range 0.0-1.0", o.DitherStrength)
 	}
 	switch o.SCBMode {
-	case "single", "per-line", "grouped":
+	case "auto", "single", "banded", "grouped", "per-line":
 	default:
-		return usagef("--scb-mode %q invalid (valid: single, per-line, grouped)", o.SCBMode)
+		return usagef("--scb-mode %q invalid (valid: auto, single, banded, grouped, per-line)", o.SCBMode)
 	}
 	switch o.Fit {
 	case prepare.FitContain, prepare.FitCover, prepare.FitStretch, prepare.FitNone:
@@ -208,9 +209,6 @@ func runConvert(e *env, cfg convertConfig) error {
 	// Plumbed-but-inert flags surface as warnings, not silence.
 	if cfg.Opt.Seed != 0 {
 		warnf("--seed has no effect: no randomized steps in this pipeline")
-	}
-	if cfg.Opt.SCBMode != "single" {
-		return fmt.Errorf("--scb-mode %q: %w (only \"single\" works so far)", cfg.Opt.SCBMode, pipeline.ErrNotImplemented)
 	}
 	if cfg.Opt.Palette != "" {
 		return fmt.Errorf("--palette: %w (targets currently use their built-in palettes)", pipeline.ErrNotImplemented)

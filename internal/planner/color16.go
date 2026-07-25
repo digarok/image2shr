@@ -26,7 +26,10 @@ func NewAdaptiveColor16() *AdaptiveColor16 { return &AdaptiveColor16{} }
 
 func (*AdaptiveColor16) Name() string { return "adaptive-color16" }
 
-func (*AdaptiveColor16) Plan(src *pix.LinearImage, _ pipeline.Options) (pipeline.Plan, error) {
+func (a *AdaptiveColor16) Plan(src *pix.LinearImage, opt pipeline.Options) (pipeline.Plan, error) {
+	if err := requireSinglePalette(a.Name(), opt); err != nil {
+		return pipeline.Plan{}, err
+	}
 	var p pipeline.Plan
 	p.Palettes[0] = bestPalette16(src)
 	// p.Line stays all zeros: every scanline uses palette 0.
@@ -54,7 +57,17 @@ type centroid struct {
 // light. Unused trailing entries duplicate entry 0 so error diffusion can
 // never be attracted to a color the image does not contain.
 func bestPalette16(src *pix.LinearImage) [16]shr.RGB12 {
-	bins := histogram444(src)
+	return paletteFromBins(histogram444(src))
+}
+
+// paletteFromBins runs the reduction (median cut → k-means → RGB444 snap →
+// dark-to-light sort) on prebuilt weighted bins, so multi-palette planners
+// can feed it any weighted subset of the image. Empty input yields the
+// all-black zero palette.
+func paletteFromBins(bins []cbin) [16]shr.RGB12 {
+	if len(bins) == 0 {
+		return [16]shr.RGB12{}
+	}
 	groups := medianCut(bins, 16)
 	cents := kmeans(bins, groups)
 

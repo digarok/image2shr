@@ -34,6 +34,10 @@ image2shr convert -o title.shr -t shr320-grey16 \
     --dither floyd-steinberg --dither-strength 0.8 --serpentine \
     --fit cover --aspect correct --luma rec709 title.jpg
 
+# Multi-palette color (16 palettes, palette switches placed adaptively):
+image2shr convert -t shr320-color256 photo.jpg
+image2shr convert -t shr320-color256 --scb-mode per-line photo.jpg
+
 # See what the IIgs will display, before ever leaving your desk:
 image2shr preview title.shr -o check.png
 image2shr preview title.shr -o big.png --size 640 --scale 2
@@ -92,9 +96,10 @@ Run `image2shr <command> --help` for every flag with examples.
 |--------|----------|-------------|
 | `shr320-grey16` | 320×200 | greyscale, single 16-grey palette, all SCBs `$00` |
 | `shr320-color16` | 320×200 | color, single adaptive 16-color palette (perceptual Oklab clustering), all SCBs `$00` |
+| `shr320-color256` | 320×200 | color, up to 16 adaptive 16-color palettes assigned per scanline; `--scb-mode` picks the strategy: `grouped` (default — contiguous bands with adaptively placed palette switches), `banded` (16 fixed bands), `per-line` (fully dynamic line clustering), `single` |
 
-More targets (color, multi-palette, 640 mode, 3200-color) plug into the same
-pipeline; see `docs/ARCHITECTURE.md` for where.
+More targets (640 mode, 3200-color) plug into the same pipeline; see
+`docs/ARCHITECTURE.md` for where.
 
 ## Documentation
 

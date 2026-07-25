@@ -370,6 +370,63 @@ func TestConvertColor16(t *testing.T) {
 	}
 }
 
+// TestConvertColor256 runs the multi-palette target end to end in every
+// --scb-mode. The contiguous modes must yield 16 bands in top-to-bottom
+// order; single-palette targets must reject multi-palette modes.
+func TestConvertColor256(t *testing.T) {
+	in := testPNG(t)
+	dir := t.TempDir()
+
+	for _, mode := range []string{"auto", "banded", "grouped", "per-line", "single"} {
+		out := filepath.Join(dir, mode+".shr")
+		code, _, stderr := run(t, nil, "convert", "-t", "shr320-color256", "--scb-mode", mode, "-o", out, in)
+		if code != 0 {
+			t.Fatalf("--scb-mode %s: exit %d, stderr: %s", mode, code, stderr)
+		}
+		data, err := os.ReadFile(out)
+		if err != nil {
+			t.Fatal(err)
+		}
+		frame, err := shr.DecodeRaw(data)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for y, scb := range frame.SCB {
+			if scb&0x80 != 0 {
+				t.Fatalf("--scb-mode %s: SCB[%d] = $%02X sets 640 mode", mode, y, scb)
+			}
+		}
+		if mode == "auto" || mode == "banded" || mode == "grouped" {
+			prev := uint8(0)
+			var seen [16]bool
+			for y, scb := range frame.SCB {
+				p := shr.SCBPalette(scb)
+				if p < prev {
+					t.Fatalf("--scb-mode %s: SCB[%d] palette %d after %d — bands must be contiguous", mode, y, p, prev)
+				}
+				prev = p
+				seen[p] = true
+			}
+			for p, ok := range seen {
+				if !ok {
+					t.Errorf("--scb-mode %s: palette %d unused", mode, p)
+				}
+			}
+		}
+	}
+
+	// A single-palette target must reject a multi-palette mode (runtime
+	// failure, not usage error: the flag value itself is valid).
+	out := filepath.Join(dir, "reject.shr")
+	code, _, stderr := run(t, nil, "convert", "-t", "shr320-grey16", "--scb-mode", "banded", "-o", out, in)
+	if code != 1 {
+		t.Fatalf("grey16 with --scb-mode banded: exit %d, want 1 (stderr: %s)", code, stderr)
+	}
+	if !strings.Contains(string(stderr), "single palette") {
+		t.Errorf("stderr %q should explain the planner is single-palette", stderr)
+	}
+}
+
 // TestPreviewSizes pins the canvas rules: 320x200 for all-320-mode images,
 // 640x400 when forced or when any scanline uses 640 mode, and a runtime
 // error when a 640-mode image is forced down to 320.

@@ -186,7 +186,9 @@ where the underlying algorithm is a stub):
         --dither NAME          none, floyd-steinberg, atkinson, jarvis, sierra, bayer2/4/8
         --dither-strength F    0.0-1.0 (default 1.0)
         --serpentine           serpentine scan for error diffusion
-        --scb-mode NAME        single, per-line, grouped   (algorithms come later)
+        --scb-mode NAME        auto, single, banded, grouped, per-line
+                               (auto = the target's natural mode; multi-palette
+                               modes need a multi-palette target)
         --palette NAME|FILE    named builtin or a palette file
         --fit MODE             contain (default), cover, stretch, none
         --aspect MODE          correct (default), ignore

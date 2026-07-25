@@ -47,7 +47,7 @@ func DefaultOptions() Options {
 		Format:         "raw",
 		Dither:         "floyd-steinberg",
 		DitherStrength: 1.0,
-		SCBMode:        "single",
+		SCBMode:        "auto", // resolves to each planner's natural mode
 		Fit:            "contain",
 		Aspect:         "correct",
 		Gamma:          1.0,

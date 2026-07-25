@@ -20,6 +20,16 @@ func TestGrey16Registered(t *testing.T) {
 	}
 }
 
+func TestColor256Registered(t *testing.T) {
+	tgt, err := pipeline.LookupTarget("shr320-color256")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if w, h := tgt.Geometry(); w != 320 || h != 200 {
+		t.Errorf("geometry = %dx%d, want 320x200", w, h)
+	}
+}
+
 func TestGrey16EndToEnd(t *testing.T) {
 	tgt, _ := pipeline.LookupTarget("shr320-grey16")
 	src := pix.New(320, 200)

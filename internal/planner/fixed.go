@@ -1,15 +1,29 @@
 // Package planner holds PalettePlanner implementations: Fixed (a
-// predetermined palette on all 200 lines) and AdaptiveColor16 (a perceptual
-// best-16-colors reduction, still one palette for the whole screen).
-// Multi-palette planners (per-line, grouped — the multi-SCB problem) plug in
-// here later.
+// predetermined palette on all 200 lines), AdaptiveColor16 (a perceptual
+// best-16-colors reduction, one palette for the whole screen), and
+// AdaptiveColor256 (up to 16 palettes distributed over the scanlines — the
+// multi-SCB planner, with banded / grouped / per-line strategies selected
+// by --scb-mode).
 package planner
 
 import (
+	"fmt"
+
 	"github.com/digarok/image2shr/internal/pipeline"
 	"github.com/digarok/image2shr/internal/pix"
 	"github.com/digarok/image2shr/shr"
 )
+
+// requireSinglePalette rejects multi-palette --scb-mode values for planners
+// that produce one palette by construction ("auto" resolves to single here).
+func requireSinglePalette(plannerName string, opt pipeline.Options) error {
+	switch opt.SCBMode {
+	case "", "auto", "single":
+		return nil
+	}
+	return fmt.Errorf("planner %s always uses a single palette; --scb-mode %s needs a multi-palette target like shr320-color256",
+		plannerName, opt.SCBMode)
+}
 
 // Fixed is the dumbest correct planner: one predetermined palette in
 // hardware slot 0, every scanline assigned to it, 320 mode.
@@ -25,7 +39,10 @@ func NewFixed(name string, palette [16]shr.RGB12) *Fixed {
 
 func (f *Fixed) Name() string { return f.name }
 
-func (f *Fixed) Plan(_ *pix.LinearImage, _ pipeline.Options) (pipeline.Plan, error) {
+func (f *Fixed) Plan(_ *pix.LinearImage, opt pipeline.Options) (pipeline.Plan, error) {
+	if err := requireSinglePalette(f.name, opt); err != nil {
+		return pipeline.Plan{}, err
+	}
 	var p pipeline.Plan
 	p.Palettes[0] = f.palette
 	// p.Line is already all zeros: every scanline uses palette 0.

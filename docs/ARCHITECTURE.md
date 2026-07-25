@@ -44,7 +44,7 @@ touching neighbors.
 | `internal/source` | Decode dispatch; `source/bmp` is our own BMP decoder. |
 | `internal/prepare` | Crop, aspect-aware box resampler, tone adjustments. |
 | `internal/pipeline` | The seams: `Options`, `Plan`, `Indexed`, the three interfaces, registries, `Run`/`PackFrame` glue. |
-| `internal/planner` | `PalettePlanner` implementations (v1: `Fixed`). |
+| `internal/planner` | `PalettePlanner` implementations: `Fixed`, `AdaptiveColor16`, `AdaptiveColor256` (multi-SCB: banded / adaptive-grouped / per-line strategies via `--scb-mode`). |
 | `internal/dither` | `Ditherer` implementations (v1: `none`, `floyd-steinberg`; stubs for the rest). |
 | `internal/target` | `Target` implementations (v1: `shr320-grey16`). |
 | `internal/writer` | Output containers + ProDOS type/auxtype + sidecar. |
@@ -84,10 +84,11 @@ CLI flag value is the `Name()`. Replace the corresponding stub in
 depends on x (via `shr.PaletteIndex640`) — currently rejected as
 not-implemented in `check320`.
 
-**New palette planner** — `internal/planner/`. This is where the multi-SCB
-problem lands: emit real per-line palette assignments in `Plan.Line` and
-palettes in `Plan.Palettes`. `pipeline.PackFrame` already writes per-line
-SCBs; the `--scb-mode` flag routing in the CLI is waiting for it.
+**New palette planner** — `internal/planner/`. Emit per-line palette
+assignments in `Plan.Line` and palettes in `Plan.Palettes`;
+`pipeline.PackFrame` already writes per-line SCBs. `AdaptiveColor256` is the
+reference multi-SCB planner — it routes the `--scb-mode` strategies (banded,
+grouped with DP-placed cuts, fully dynamic per-line clustering).
 
 **New output format** — one file in `internal/writer/`. Implement `Format`
 (including `ProDOS()`), register in `init()`. The `packed`, `apf`, and
