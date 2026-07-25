@@ -14,6 +14,28 @@ Built for two consumers:
 
 Written in Go, standard library only. Licensed GPL-3.0.
 
+## Samples
+
+Wikimedia Commons'
+[Gradient_color_wheel.png](https://commons.wikimedia.org/wiki/File:Gradient_color_wheel.png)
+(CC0), converted with each target's defaults and previewed back to PNG —
+every image below is a pixel-exact rendering of what the IIgs displays:
+
+```sh
+curl -LO https://commons.wikimedia.org/wiki/Special:FilePath/Gradient_color_wheel.png
+image2shr convert -t shr320-grey16   -o wheel-grey16.shr   Gradient_color_wheel.png
+image2shr convert -t shr320-color16  -o wheel-color16.shr  Gradient_color_wheel.png
+image2shr convert -t shr320-color256 -o wheel-color256.shr Gradient_color_wheel.png
+image2shr preview wheel-grey16.shr   -o wheel-grey16.png
+image2shr preview wheel-color16.shr  -o wheel-color16.png
+image2shr preview wheel-color256.shr -o wheel-color256.png
+```
+
+| `shr320-grey16` | `shr320-color16` | `shr320-color256` |
+|-----------------|------------------|-------------------|
+| ![grey16 preview](docs/samples/wheel-grey16.png) | ![color16 preview](docs/samples/wheel-color16.png) | ![color256 preview](docs/samples/wheel-color256.png) |
+| 16 greys | one 16-color palette | 16 palettes, switched per scanline |
+
 ## Build
 
 ```sh
