@@ -314,6 +314,62 @@ func TestFlagsAfterPositional(t *testing.T) {
 	}
 }
 
+// TestConvertColor16 runs the adaptive-color target end to end: a saturated
+// quadrant image must yield a palette that kept its hues.
+func TestConvertColor16(t *testing.T) {
+	img := image.NewRGBA(image.Rect(0, 0, 64, 40))
+	quads := []color.RGBA{
+		{255, 0, 0, 255}, {0, 255, 0, 255}, {0, 0, 255, 255}, {255, 255, 0, 255},
+	}
+	for y := 0; y < 40; y++ {
+		for x := 0; x < 64; x++ {
+			img.Set(x, y, quads[(y/20)*2+x/32])
+		}
+	}
+	in := filepath.Join(t.TempDir(), "quads.png")
+	f, err := os.Create(in)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		t.Fatal(err)
+	}
+	f.Close()
+
+	out := filepath.Join(t.TempDir(), "out.shr")
+	code, _, stderr := run(t, nil, "convert", "-t", "shr320-color16", "--dither", "none", "-o", out, in)
+	if code != 0 {
+		t.Fatalf("exit %d, stderr: %s", code, stderr)
+	}
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	frame, err := shr.DecodeRaw(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for y, scb := range frame.SCB {
+		if scb != 0 {
+			t.Fatalf("SCB[%d] = $%02X, want $00", y, scb)
+		}
+	}
+	for _, want := range []shr.RGB12{
+		{R: 15, G: 0, B: 0}, {R: 0, G: 15, B: 0}, {R: 0, G: 0, B: 15}, {R: 15, G: 15, B: 0},
+	} {
+		found := false
+		for _, c := range frame.Palettes[0] {
+			if c == want {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Errorf("palette %v lost source color %v", frame.Palettes[0], want)
+		}
+	}
+}
+
 // TestPreviewSizes pins the canvas rules: 320x200 for all-320-mode images,
 // 640x400 when forced or when any scanline uses 640 mode, and a runtime
 // error when a 640-mode image is forced down to 320.

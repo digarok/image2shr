@@ -1,6 +1,8 @@
-// Package planner holds PalettePlanner implementations. Milestone 1 has
-// exactly one: a fixed palette on all 200 lines. Real planners (per-line,
-// grouped — the multi-SCB problem) plug in here later.
+// Package planner holds PalettePlanner implementations: Fixed (a
+// predetermined palette on all 200 lines) and AdaptiveColor16 (a perceptual
+// best-16-colors reduction, still one palette for the whole screen).
+// Multi-palette planners (per-line, grouped — the multi-SCB problem) plug in
+// here later.
 package planner
 
 import (

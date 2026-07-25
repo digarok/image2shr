@@ -91,6 +91,7 @@ Run `image2shr <command> --help` for every flag with examples.
 | Target | Geometry | Description |
 |--------|----------|-------------|
 | `shr320-grey16` | 320×200 | greyscale, single 16-grey palette, all SCBs `$00` |
+| `shr320-color16` | 320×200 | color, single adaptive 16-color palette (perceptual Oklab clustering), all SCBs `$00` |
 
 More targets (color, multi-palette, 640 mode, 3200-color) plug into the same
 pipeline; see `docs/ARCHITECTURE.md` for where.
