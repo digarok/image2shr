@@ -23,18 +23,20 @@ every image below is a pixel-exact rendering of what the IIgs displays:
 
 ```sh
 curl -LO https://commons.wikimedia.org/wiki/Special:FilePath/Gradient_color_wheel.png
-image2shr convert -t shr320-grey16   -o wheel-grey16.shr   Gradient_color_wheel.png
-image2shr convert -t shr320-color16  -o wheel-color16.shr  Gradient_color_wheel.png
-image2shr convert -t shr320-color256 -o wheel-color256.shr Gradient_color_wheel.png
-image2shr preview wheel-grey16.shr   -o wheel-grey16.png
-image2shr preview wheel-color16.shr  -o wheel-color16.png
-image2shr preview wheel-color256.shr -o wheel-color256.png
+image2shr convert -t shr320-grey16    -o wheel-grey16.shr    Gradient_color_wheel.png
+image2shr convert -t shr320-color16   -o wheel-color16.shr   Gradient_color_wheel.png
+image2shr convert -t shr320-color256  -o wheel-color256.shr  Gradient_color_wheel.png
+image2shr convert -t shr320-color3200 -o wheel-color3200.3200 Gradient_color_wheel.png
+image2shr preview wheel-grey16.shr    -o wheel-grey16.png
+image2shr preview wheel-color16.shr   -o wheel-color16.png
+image2shr preview wheel-color256.shr  -o wheel-color256.png
+image2shr preview wheel-color3200.3200 -o wheel-color3200.png
 ```
 
-| `shr320-grey16` | `shr320-color16` | `shr320-color256` |
-|-----------------|------------------|-------------------|
-| ![grey16 preview](docs/samples/wheel-grey16.png) | ![color16 preview](docs/samples/wheel-color16.png) | ![color256 preview](docs/samples/wheel-color256.png) |
-| 16 greys | one 16-color palette | 16 palettes, switched per scanline |
+| `shr320-grey16` | `shr320-color16` | `shr320-color256` | `shr320-color3200` |
+|-----------------|------------------|-------------------|--------------------|
+| ![grey16 preview](docs/samples/wheel-grey16.png) | ![color16 preview](docs/samples/wheel-color16.png) | ![color256 preview](docs/samples/wheel-color256.png) | ![color3200 preview](docs/samples/wheel-color3200.png) |
+| 16 greys | one 16-color palette | 16 palettes, switched per scanline | a palette per scanline (Brooks) |
 
 ## Build
 
@@ -110,7 +112,11 @@ Run `image2shr <command> --help` for every flag with examples.
 | `raw`      | 32,768-byte uncompressed screen dump | PIC `$C1`/`$0000` | ✔ |
 | `packed`   | PackBytes-compressed screen | PNT `$C0`/`$0001` | stub |
 | `apf`      | Apple Preferred Format (block-structured) | PNT `$C0`/`$0002` | stub |
-| `brooks`   | Brooks 3200-color | PIC `$C1`/`$0002` | stub |
+| `brooks`   | Brooks 3200-color (38,400 bytes, 200 per-line palettes) | PIC `$C1`/`$0002` | ✔ |
+
+`--format` defaults to `auto`: `raw`, or `brooks` for 3200-color frames —
+which also picks the `.3200` output extension when `-o` is omitted. Any
+target can be forced to `brooks`; its palettes are expanded per line.
 
 ## Targets
 
@@ -119,8 +125,9 @@ Run `image2shr <command> --help` for every flag with examples.
 | `shr320-grey16` | 320×200 | greyscale, single 16-grey palette, all SCBs `$00` |
 | `shr320-color16` | 320×200 | color, single adaptive 16-color palette (perceptual Oklab clustering), all SCBs `$00` |
 | `shr320-color256` | 320×200 | color, up to 16 adaptive 16-color palettes assigned per scanline; `--scb-mode` picks the strategy: `grouped` (default — contiguous bands with adaptively placed palette switches), `banded` (16 fixed bands), `per-line` (fully dynamic line clustering), `single` |
+| `shr320-color3200` | 320×200 | color, one adaptive 16-color palette per scanline (Brooks 3200-color, `.3200` file) |
 
-More targets (640 mode, 3200-color) plug into the same pipeline; see
+More targets (640 mode) plug into the same pipeline; see
 `docs/ARCHITECTURE.md` for where.
 
 ## Documentation

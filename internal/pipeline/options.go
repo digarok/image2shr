@@ -44,7 +44,7 @@ type Options struct {
 func DefaultOptions() Options {
 	return Options{
 		Target:         "shr320-grey16",
-		Format:         "raw",
+		Format:         "auto", // raw, or brooks for 3200-color frames
 		Dither:         "floyd-steinberg",
 		DitherStrength: 1.0,
 		SCBMode:        "auto", // resolves to each planner's natural mode

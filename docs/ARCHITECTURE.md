@@ -44,7 +44,7 @@ touching neighbors.
 | `internal/source` | Decode dispatch; `source/bmp` is our own BMP decoder. |
 | `internal/prepare` | Crop, aspect-aware box resampler, tone adjustments. |
 | `internal/pipeline` | The seams: `Options`, `Plan`, `Indexed`, the three interfaces, registries, `Run`/`PackFrame` glue. |
-| `internal/planner` | `PalettePlanner` implementations: `Fixed`, `AdaptiveColor16`, `AdaptiveColor256` (multi-SCB: banded / adaptive-grouped / per-line strategies via `--scb-mode`). |
+| `internal/planner` | `PalettePlanner` implementations: `Fixed`, `AdaptiveColor16`, `AdaptiveColor256` (multi-SCB: banded / adaptive-grouped / per-line strategies via `--scb-mode`), `AdaptiveColor3200` (one palette per scanline, Brooks). |
 | `internal/dither` | `Ditherer` implementations (v1: `none`, `floyd-steinberg`; stubs for the rest). |
 | `internal/target` | `Target` implementations (v1: `shr320-grey16`). |
 | `internal/writer` | Output containers + ProDOS type/auxtype + sidecar. |

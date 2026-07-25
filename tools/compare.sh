@@ -6,7 +6,8 @@
 # The narrow companion to permute.sh: every target and color256 --scb-mode
 # strategy, each with and without dithering, all at the default framing
 # (--fit contain, --aspect correct) so the outputs differ only in how they
-# use the palette hardware. 10 outputs total.
+# use the palette hardware. 12 outputs total. The color3200 .shr files are
+# Brooks-format (38,400 bytes) despite the extension; preview sniffs by size.
 #
 # Writes <output-dir>/shr/<name>.shr and <output-dir>/preview/<name>.png,
 # where <name> is <mode>_<dither> (e.g. color256-grouped_fs).
@@ -35,9 +36,9 @@ fi
 mkdir -p "$outdir/shr" "$outdir/preview"
 
 # Parallel arrays: target + scb-mode per conversion mode, and its name tag.
-mode_targets=(shr320-grey16 shr320-color16 shr320-color256 shr320-color256 shr320-color256)
-mode_scbs=(auto auto banded grouped per-line)
-mode_tags=(grey16 color16 color256-banded color256-grouped color256-perline)
+mode_targets=(shr320-grey16 shr320-color16 shr320-color256 shr320-color256 shr320-color256 shr320-color3200)
+mode_scbs=(auto auto banded grouped per-line auto)
+mode_tags=(grey16 color16 color256-banded color256-grouped color256-perline color3200)
 
 count=0
 for m in "${!mode_targets[@]}"; do

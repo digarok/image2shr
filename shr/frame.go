@@ -69,10 +69,18 @@ func (c RGB12) String() string {
 // Frame is the central data structure of the whole program: one complete
 // SHR screen. Conversion produces a Frame, writers serialize a Frame, the
 // renderer turns a Frame back into an RGB image.
+//
+// LinePalettes is nil for a normal 16-palette screen. A 3200-color frame
+// (Brooks format) sets it: every scanline owns a full 16-color palette,
+// there are no meaningful SCB palette bits (the hardware trick reloads the
+// color tables while racing the beam), and only 320 mode is possible. Such
+// a frame cannot be serialized into the 32,768-byte raw screen — use
+// EncodeBrooks.
 type Frame struct {
-	Pixels   [PixelDataSize]byte // raw packed pixel bytes, 200 lines × 160
-	SCB      [Height]byte
-	Palettes [16][16]RGB12
+	Pixels       [PixelDataSize]byte // raw packed pixel bytes, 200 lines × 160
+	SCB          [Height]byte
+	Palettes     [16][16]RGB12
+	LinePalettes *[Height][16]RGB12 // non-nil ⇒ 3200-color (Brooks) frame
 }
 
 // Line returns the 160 packed pixel bytes of scanline y.
@@ -80,8 +88,12 @@ func (f *Frame) Line(y int) []byte {
 	return f.Pixels[y*BytesPerLine : (y+1)*BytesPerLine]
 }
 
-// LinePalette returns the palette selected by scanline y's SCB.
+// LinePalette returns the palette scanline y draws with: its own palette on
+// a 3200-color frame, otherwise the one selected by its SCB.
 func (f *Frame) LinePalette(y int) *[16]RGB12 {
+	if f.LinePalettes != nil {
+		return &f.LinePalettes[y]
+	}
 	return &f.Palettes[f.SCB[y]&SCBPaletteMask]
 }
 

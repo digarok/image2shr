@@ -20,6 +20,9 @@ func (rawFormat) Description() string { return "uncompressed 32768-byte SHR scre
 func (rawFormat) ProDOS() (uint8, uint16) { return 0xC1, 0x0000 }
 
 func (rawFormat) Encode(w io.Writer, f *shr.Frame) error {
+	if f.LinePalettes != nil {
+		return fmt.Errorf("a 3200-color frame does not fit the 32KB raw screen; use --format brooks")
+	}
 	if _, err := w.Write(f.EncodeRaw()); err != nil {
 		return fmt.Errorf("writing raw SHR: %w", err)
 	}

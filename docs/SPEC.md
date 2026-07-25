@@ -182,7 +182,8 @@ where the underlying algorithm is a stub):
 
     -o, --output PATH          output file, "-" for stdout
     -t, --target NAME          conversion target (default shr320-grey16)
-        --format NAME          container: raw (default), packed, apf, brooks
+        --format NAME          container: auto (default — raw, or brooks for
+                               3200-color frames), raw, packed, apf, brooks
         --dither NAME          none, floyd-steinberg, atkinson, jarvis, sierra, bayer2/4/8
         --dither-strength F    0.0-1.0 (default 1.0)
         --serpentine           serpentine scan for error diffusion

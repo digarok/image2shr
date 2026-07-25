@@ -42,7 +42,6 @@ func TestStubFormats(t *testing.T) {
 	expect := map[string][2]uint16{ // fileType, auxType
 		"packed": {0xC0, 0x0001},
 		"apf":    {0xC0, 0x0002},
-		"brooks": {0xC1, 0x0002},
 	}
 	for name, want := range expect {
 		f, err := Lookup(name)
@@ -56,6 +55,33 @@ func TestStubFormats(t *testing.T) {
 		if err := f.Encode(&bytes.Buffer{}, &shr.Frame{}); !errors.Is(err, ErrNotImplemented) {
 			t.Errorf("%s Encode err = %v, want ErrNotImplemented", name, err)
 		}
+	}
+}
+
+func TestBrooksEncode(t *testing.T) {
+	brooks, err := Lookup("brooks")
+	if err != nil {
+		t.Fatal(err)
+	}
+	ft, at := brooks.ProDOS()
+	if ft != 0xC1 || at != 0x0002 {
+		t.Errorf("brooks ProDOS = $%02X/$%04X, want $C1/$0002", ft, at)
+	}
+	var buf bytes.Buffer
+	if err := brooks.Encode(&buf, &shr.Frame{}); err != nil {
+		t.Fatal(err)
+	}
+	if buf.Len() != shr.BrooksSize {
+		t.Errorf("brooks output = %d bytes, want %d", buf.Len(), shr.BrooksSize)
+	}
+}
+
+// TestRawRejects3200: a per-line-palette frame cannot fit the raw container.
+func TestRawRejects3200(t *testing.T) {
+	raw, _ := Lookup("raw")
+	f := &shr.Frame{LinePalettes: &[shr.Height][16]shr.RGB12{}}
+	if err := raw.Encode(&bytes.Buffer{}, f); err == nil {
+		t.Error("raw accepted a 3200-color frame")
 	}
 }
 

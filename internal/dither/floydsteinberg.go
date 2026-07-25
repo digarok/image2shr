@@ -31,7 +31,7 @@ func (floydSteinberg) Apply(src *pix.LinearImage, plan pipeline.Plan, opt pipeli
 	buf := make([]float32, len(src.Pix))
 	copy(buf, src.Pix)
 
-	var pals [16]*linearPalette
+	pc := palCache{plan: &plan}
 	// add spreads a share of the quantization error onto neighbor (x, y).
 	add := func(x, y int, er, eg, eb, weight float32) {
 		if x < 0 || x >= w || y >= h {
@@ -44,12 +44,7 @@ func (floydSteinberg) Apply(src *pix.LinearImage, plan pipeline.Plan, opt pipeli
 	}
 
 	for y := 0; y < h; y++ {
-		pn := plan.Line[y]
-		if pals[pn] == nil {
-			lp := toLinear(plan.Palettes[pn])
-			pals[pn] = &lp
-		}
-		lp := pals[pn]
+		lp := pc.forLine(y)
 
 		// dir = +1 left→right; serpentine flips odd rows and mirrors the
 		// kernel horizontally.

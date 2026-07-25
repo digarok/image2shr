@@ -10,12 +10,13 @@
 # The output-dir defaults to ./permutations.
 #
 # Permutes only the discrete flags that have working implementations:
-# all three targets (grey16, color16, color256), dither none /
+# all four targets (grey16, color16, color256, color3200), dither none /
 # floyd-steinberg / floyd-steinberg+serpentine, all four --fit modes, both
 # --aspect modes, all three --luma weightings for grey16 only (the color
 # targets ignore --luma), and the three multi-palette --scb-mode strategies
 # for color256 only ("single" there would duplicate the color16 output).
-# 168 outputs total.
+# 192 outputs total. The color3200 .shr files are Brooks-format (38,400
+# bytes) despite the extension; preview sniffs by size.
 # Continuous knobs (--dither-strength, --gamma, --brightness, --contrast,
 # --saturation) stay at their defaults, and stub algorithms (atkinson,
 # jarvis, sierra, bayer*, packed/apf/brooks formats, scb-mode per-line and
@@ -46,7 +47,7 @@ mkdir -p "$outdir/shr" "$outdir/preview"
 # Parallel arrays: extra convert flags and the filename tag for each variant.
 dither_flags=("--dither none" "--dither floyd-steinberg" "--dither floyd-steinberg --serpentine")
 dither_tags=(none fs fs-serp)
-targets=(shr320-grey16 shr320-color16 shr320-color256)
+targets=(shr320-grey16 shr320-color16 shr320-color256 shr320-color3200)
 fits=(contain cover stretch none)
 aspects=(correct ignore)
 

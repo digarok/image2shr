@@ -83,10 +83,10 @@ func Render640(f *Frame) *image.RGBA {
 }
 
 // line320Colors resolves a 320-mode scanline to its 320 colors, honoring the
-// line's palette and color-fill mode.
+// line's palette (per-line on 3200-color frames) and color-fill mode.
 func line320Colors(f *Frame, y int) [Width320]color.RGBA {
 	scb := f.SCB[y]
-	pal := &f.Palettes[SCBPalette(scb)]
+	pal := f.LinePalette(y)
 	idx := UnpackLine320(f.Line(y))
 	fill := SCBIsFill(scb)
 

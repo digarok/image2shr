@@ -11,11 +11,25 @@ import (
 // palette each of the 200 scanlines uses. Milestone 1 uses one palette and
 // one mode for the whole frame; the per-line fields exist so multi-SCB
 // planners plug in without changing the seams.
+//
+// A 3200-color plan sets LinePalettes instead: one full palette per
+// scanline, beyond what SCBs can express. Such plans are 320-mode only and
+// pack into Brooks-format frames.
 type Plan struct {
-	Palettes [16][16]shr.RGB12
-	Line     [200]uint8 // palette number (0-15) per scanline
-	Mode640  bool       // per-frame for now; SCBs are still written per line
-	Fill     bool       // 320-mode color fill (v1 planners never set it)
+	Palettes     [16][16]shr.RGB12
+	Line         [200]uint8 // palette number (0-15) per scanline
+	Mode640      bool       // per-frame for now; SCBs are still written per line
+	Fill         bool       // 320-mode color fill (v1 planners never set it)
+	LinePalettes *[200][16]shr.RGB12
+}
+
+// PaletteFor returns the palette scanline y is quantized against under this
+// plan — the only correct way for a ditherer to pick a line's palette.
+func (p *Plan) PaletteFor(y int) *[16]shr.RGB12 {
+	if p.LinePalettes != nil {
+		return &p.LinePalettes[y]
+	}
+	return &p.Palettes[p.Line[y]]
 }
 
 // Indexed is a Ditherer's output: one raw pixel VALUE per pixel, exactly as
@@ -75,7 +89,14 @@ func PackFrame(plan Plan, idx Indexed) (*shr.Frame, error) {
 	if idx.W != wantW || idx.H != shr.Height {
 		return nil, fmt.Errorf("packing: indexed image is %dx%d, want %dx%d", idx.W, idx.H, wantW, shr.Height)
 	}
+	if plan.LinePalettes != nil && plan.Mode640 {
+		return nil, fmt.Errorf("packing: per-line palettes (3200-color) are 320-mode only")
+	}
 	f := &shr.Frame{Palettes: plan.Palettes}
+	if plan.LinePalettes != nil {
+		lp := *plan.LinePalettes
+		f.LinePalettes = &lp
+	}
 	for y := 0; y < shr.Height; y++ {
 		f.SCB[y] = shr.MakeSCB(plan.Mode640, false, plan.Fill, plan.Line[y])
 		row := idx.Pix[y*idx.W : (y+1)*idx.W]

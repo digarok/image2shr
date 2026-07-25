@@ -23,11 +23,12 @@ pixel shape. --size 640 forces the 640x400 canvas for an all-320-mode image
 (each pixel becomes a 2x2 block); --size 320 fails if the image contains
 640-mode scanlines. --scale enlarges the chosen canvas further.
 
-Only uncompressed 32768-byte screens are supported so far. The input "-"
-reads stdin.
+Supported inputs: uncompressed 32768-byte screens and 38400-byte Brooks
+3200-color files, told apart by size. The input "-" reads stdin.
 
 Examples:
   image2shr preview title.shr -o title.png
+  image2shr preview title.3200 -o title.png
   image2shr preview title.shr -o big.png --size 640 --scale 2
   image2shr preview title.shr -o - > out.png
 `
@@ -95,7 +96,8 @@ func cmdPreview(e *env, args []string) error {
 	return nil
 }
 
-// readFrame loads an uncompressed SHR screen from a path or stdin ("-").
+// readFrame loads an uncompressed SHR screen or a Brooks 3200-color file
+// from a path or stdin ("-"); the two are distinguished by size.
 func readFrame(e *env, path string) (*shr.Frame, error) {
 	var data []byte
 	var err error
@@ -108,9 +110,18 @@ func readFrame(e *env, path string) (*shr.Frame, error) {
 			return nil, fmt.Errorf("reading input: %w", err)
 		}
 	}
-	frame, err := shr.DecodeRaw(data)
+	var frame *shr.Frame
+	switch len(data) {
+	case shr.FrameSize:
+		frame, err = shr.DecodeRaw(data)
+	case shr.BrooksSize:
+		frame, err = shr.DecodeBrooks(data)
+	default:
+		err = fmt.Errorf("size %d is neither a raw screen (%d) nor a Brooks 3200 file (%d); compressed/APF reading not supported yet",
+			len(data), shr.FrameSize, shr.BrooksSize)
+	}
 	if err != nil {
-		return nil, fmt.Errorf("%s: %w (compressed/APF/Brooks reading not supported yet)", path, err)
+		return nil, fmt.Errorf("%s: %w", path, err)
 	}
 	return frame, nil
 }

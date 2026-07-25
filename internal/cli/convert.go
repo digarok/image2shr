@@ -27,7 +27,8 @@ Usage:
   image2shr convert [flags] <input>
 
 The input "-" reads from stdin. Without -o, the output lands next to the
-input with the extension replaced by .shr (stdin input requires -o).
+input with the extension replaced by .shr — or .3200 when the resolved
+format is brooks (stdin input requires -o).
 
 Examples:
   image2shr convert photo.png
@@ -62,7 +63,7 @@ func cmdConvert(e *env, args []string) error {
 	fs.StringVar(&cfg.Output, "o", "", "alias for --output")
 	fs.StringVar(&cfg.Opt.Target, "target", def.Target, "conversion target (see \"image2shr targets\")")
 	fs.StringVar(&cfg.Opt.Target, "t", def.Target, "alias for --target")
-	fs.StringVar(&cfg.Opt.Format, "format", def.Format, "output container: raw, packed, apf, brooks")
+	fs.StringVar(&cfg.Opt.Format, "format", def.Format, "output container: auto, raw, packed, apf, brooks")
 	fs.StringVar(&cfg.Opt.Dither, "dither", def.Dither, "none, floyd-steinberg, atkinson, jarvis, sierra, bayer2/4/8")
 	fs.Float64Var(&cfg.Opt.DitherStrength, "dither-strength", def.DitherStrength, "error diffusion strength, 0.0-1.0")
 	fs.BoolVar(&cfg.Opt.Serpentine, "serpentine", false, "serpentine scan for error diffusion")
@@ -114,8 +115,10 @@ func validateConvert(cfg *convertConfig) error {
 	if _, err := pipeline.LookupTarget(o.Target); err != nil {
 		return usageError{err}
 	}
-	if _, err := writer.Lookup(o.Format); err != nil {
-		return usageError{err}
+	if o.Format != "auto" { // auto resolves after conversion, from the frame
+		if _, err := writer.Lookup(o.Format); err != nil {
+			return usageError{err}
+		}
 	}
 	if _, err := pipeline.LookupDitherer(o.Dither); err != nil {
 		return usageError{err}
@@ -153,10 +156,8 @@ func validateConvert(cfg *convertConfig) error {
 	if cfg.Sidecar && cfg.Output == "-" {
 		return usagef("--sidecar needs a file output, not stdout")
 	}
-	if cfg.Output == "" {
-		base := strings.TrimSuffix(cfg.Input, filepath.Ext(cfg.Input))
-		cfg.Output = base + ".shr"
-	}
+	// The default output name is chosen in runConvert, after the container
+	// format is resolved: its extension depends on the format.
 	return nil
 }
 
@@ -184,8 +185,8 @@ type convertReport struct {
 	Output       string           `json:"output"`
 	OutputSize   int              `json:"output_size"`
 	ProDOS       prodosInfo       `json:"prodos"`
-	PalettesUsed []paletteReport  `json:"palettes_used"`
-	LinePalettes []int            `json:"line_palettes"`
+	PalettesUsed []paletteReport  `json:"palettes_used,omitempty"`
+	LinePalettes []int            `json:"line_palettes,omitempty"`
 	TimingMS     float64          `json:"timing_ms"`
 	Warnings     []string         `json:"warnings"`
 }
@@ -215,10 +216,6 @@ func runConvert(e *env, cfg convertConfig) error {
 	}
 
 	tgt, err := pipeline.LookupTarget(cfg.Opt.Target)
-	if err != nil {
-		return err
-	}
-	format, err := writer.Lookup(cfg.Opt.Format)
 	if err != nil {
 		return err
 	}
@@ -277,6 +274,29 @@ func runConvert(e *env, cfg convertConfig) error {
 		return fmt.Errorf("target %s: %w", tgt.Name(), err)
 	}
 	logv("converted with target %s", tgt.Name())
+
+	// Resolve the container: auto picks the only default that can hold the
+	// frame — brooks for 3200-color frames (200 per-line palettes), raw
+	// otherwise. An explicit incompatible choice fails in the writer.
+	if cfg.Opt.Format == "auto" {
+		if frame.LinePalettes != nil {
+			cfg.Opt.Format = "brooks"
+		} else {
+			cfg.Opt.Format = "raw"
+		}
+	}
+	format, err := writer.Lookup(cfg.Opt.Format)
+	if err != nil {
+		return err
+	}
+	if cfg.Output == "" {
+		ext := ".shr"
+		if cfg.Opt.Format == "brooks" {
+			ext = ".3200" // the community convention for $C1/$0002 files
+		}
+		cfg.Output = strings.TrimSuffix(cfg.Input, filepath.Ext(cfg.Input)) + ext
+	}
+	logv("container format %s → %s", cfg.Opt.Format, cfg.Output)
 
 	// Encode container.
 	var buf bytes.Buffer
@@ -346,8 +366,12 @@ func writePreviewPNG(path string, frame *shr.Frame) error {
 }
 
 // usedPalettes lists each palette referenced by at least one SCB, in index
-// order (deterministic).
+// order (deterministic). Nil for Brooks 3200-color frames — they have no
+// SCB table and 200 palettes; inspect reports those instead.
 func usedPalettes(f *shr.Frame) []paletteReport {
+	if f.LinePalettes != nil {
+		return nil
+	}
 	var used [16]bool
 	for _, scb := range f.SCB {
 		used[shr.SCBPalette(scb)] = true
@@ -367,6 +391,9 @@ func usedPalettes(f *shr.Frame) []paletteReport {
 }
 
 func linePalettes(f *shr.Frame) []int {
+	if f.LinePalettes != nil {
+		return nil // every line has its own palette; SCB numbers are void
+	}
 	out := make([]int, shr.Height)
 	for y, scb := range f.SCB {
 		out[y] = int(shr.SCBPalette(scb))

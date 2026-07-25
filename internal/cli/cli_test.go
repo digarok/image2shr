@@ -427,6 +427,65 @@ func TestConvertColor256(t *testing.T) {
 	}
 }
 
+// TestConvertColor3200 runs the Brooks target end to end: auto format must
+// produce a 38400-byte .3200 file (default extension included), preview and
+// inspect must read it back, raw must refuse it, and --format brooks must
+// expand an ordinary 16-palette target.
+func TestConvertColor3200(t *testing.T) {
+	in := testPNG(t)
+	dir := t.TempDir()
+
+	// Default -o: extension becomes .3200 because the format resolves to
+	// brooks. The input lives in a temp dir, so the output lands beside it.
+	code, _, stderr := run(t, nil, "convert", "-t", "shr320-color3200", in)
+	if code != 0 {
+		t.Fatalf("exit %d, stderr: %s", code, stderr)
+	}
+	out := strings.TrimSuffix(in, ".png") + ".3200"
+	data, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatalf("default output name should be %s: %v", out, err)
+	}
+	if len(data) != shr.BrooksSize {
+		t.Fatalf("output = %d bytes, want %d", len(data), shr.BrooksSize)
+	}
+	frame, err := shr.DecodeBrooks(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if frame.LinePalettes == nil {
+		t.Fatal("decoded frame has no per-line palettes")
+	}
+
+	// preview and inspect read the .3200 file back.
+	png := filepath.Join(dir, "out.png")
+	if code, _, stderr := run(t, nil, "preview", out, "-o", png); code != 0 {
+		t.Fatalf("preview: exit %d, stderr: %s", code, stderr)
+	}
+	checkPNGSize(t, png, 320, 200)
+	code, stdout, stderr := run(t, nil, "inspect", out)
+	if code != 0 {
+		t.Fatalf("inspect: exit %d, stderr: %s", code, stderr)
+	}
+	if !strings.Contains(string(stdout), "3200") {
+		t.Errorf("inspect output should mention 3200-color:\n%s", stdout)
+	}
+
+	// Raw cannot hold the frame (runtime failure, not usage error).
+	if code, _, _ := run(t, nil, "convert", "-t", "shr320-color3200", "--format", "raw", "-o", filepath.Join(dir, "x.shr"), in); code != 1 {
+		t.Fatalf("--format raw with 3200 target: exit %d, want 1", code)
+	}
+
+	// Any target can be written as brooks by expanding its palettes.
+	grey := filepath.Join(dir, "grey.3200")
+	if code, _, stderr := run(t, nil, "convert", "-t", "shr320-grey16", "--format", "brooks", "-o", grey, in); code != 0 {
+		t.Fatalf("grey16 as brooks: exit %d, stderr: %s", code, stderr)
+	}
+	if fi, err := os.Stat(grey); err != nil || fi.Size() != int64(shr.BrooksSize) {
+		t.Fatalf("grey16-as-brooks size = %v (err %v), want %d", fi, err, shr.BrooksSize)
+	}
+}
+
 // TestPreviewSizes pins the canvas rules: 320x200 for all-320-mode images,
 // 640x400 when forced or when any scanline uses 640 mode, and a runtime
 // error when a 640-mode image is forced down to 320.

@@ -55,6 +55,28 @@ func (lp *linearPalette) nearest(r, g, b float32) (idx uint8, er, eg, eb float32
 	return idx, r - c[0], g - c[1], b - c[2]
 }
 
+// palCache resolves each scanline's palette to matching form via
+// Plan.PaletteFor, converting each distinct hardware palette once on
+// 16-palette plans. Per-line (3200-color) plans convert per line — 200
+// small conversions.
+type palCache struct {
+	plan  *pipeline.Plan
+	slots [16]*linearPalette
+}
+
+func (pc *palCache) forLine(y int) *linearPalette {
+	if pc.plan.LinePalettes != nil {
+		lp := toLinear(pc.plan.LinePalettes[y])
+		return &lp
+	}
+	pn := pc.plan.Line[y]
+	if pc.slots[pn] == nil {
+		lp := toLinear(pc.plan.Palettes[pn])
+		pc.slots[pn] = &lp
+	}
+	return pc.slots[pn]
+}
+
 // check320 rejects work the v1 ditherers can't do yet. 640-mode dithering
 // (choosing 2-bit values through the position-dependent palette groups) is
 // a real algorithm the maintainer will spec later; guessing it here is an

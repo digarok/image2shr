@@ -17,16 +17,9 @@ func (none) Apply(src *pix.LinearImage, plan pipeline.Plan, _ pipeline.Options) 
 		return pipeline.Indexed{}, err
 	}
 	out := pipeline.Indexed{W: src.W, H: src.H, Pix: make([]uint8, src.W*src.H)}
-	// One linear palette per hardware palette, built lazily per line since
-	// the plan may assign different palettes to different lines.
-	var pals [16]*linearPalette
+	pc := palCache{plan: &plan}
 	for y := 0; y < src.H; y++ {
-		pn := plan.Line[y]
-		if pals[pn] == nil {
-			lp := toLinear(plan.Palettes[pn])
-			pals[pn] = &lp
-		}
-		lp := pals[pn]
+		lp := pc.forLine(y)
 		for x := 0; x < src.W; x++ {
 			r, g, b := src.At(x, y)
 			idx, _, _, _ := lp.nearest(r, g, b)
