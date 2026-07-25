@@ -12,7 +12,7 @@ func cmdVersion(e *env, args []string) error {
 	fs := newFlagSet(e, "version", versionUsage)
 	var asJSON bool
 	fs.BoolVar(&asJSON, "json", false, "machine-readable version on stdout")
-	if err := parse(fs, args); err != nil {
+	if _, err := parse(fs, args); err != nil {
 		return err
 	}
 	if asJSON {

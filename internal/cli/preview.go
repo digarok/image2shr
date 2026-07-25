@@ -34,10 +34,11 @@ func cmdPreview(e *env, args []string) error {
 	fs.StringVar(&output, "o", "", "alias for --output")
 	fs.IntVar(&scale, "scale", 1, "integer scale factor for the 640x200 canvas")
 
-	if err := parse(fs, args); err != nil {
+	pos, err := parse(fs, args)
+	if err != nil {
 		return err
 	}
-	if fs.NArg() != 1 {
+	if len(pos) != 1 {
 		return usagef("preview needs exactly one .shr file; see --help")
 	}
 	if output == "" {
@@ -47,7 +48,7 @@ func cmdPreview(e *env, args []string) error {
 		return usagef("--scale %d out of range 1-16", scale)
 	}
 
-	frame, err := readFrame(e, fs.Arg(0))
+	frame, err := readFrame(e, pos[0])
 	if err != nil {
 		return err
 	}

@@ -27,10 +27,11 @@ func cmdTargets(e *env, args []string) error {
 	fs := newFlagSet(e, "targets", targetsUsage)
 	var asJSON bool
 	fs.BoolVar(&asJSON, "json", false, "machine-readable list on stdout")
-	if err := parse(fs, args); err != nil {
+	pos, err := parse(fs, args)
+	if err != nil {
 		return err
 	}
-	if fs.NArg() != 0 {
+	if len(pos) != 0 {
 		return usagef("targets takes no arguments")
 	}
 

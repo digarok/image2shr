@@ -123,13 +123,32 @@ func newFlagSet(e *env, name, usage string) *flag.FlagSet {
 	return fs
 }
 
-// parse wraps FlagSet.Parse, converting parse failures to usage errors.
-func parse(fs *flag.FlagSet, args []string) error {
-	if err := fs.Parse(args); err != nil {
-		if errors.Is(err, flag.ErrHelp) {
-			return flag.ErrHelp
+// parse wraps FlagSet.Parse, allowing flags and positional arguments to be
+// interleaved ("image2shr preview title.shr -o out.png"): the stdlib parser
+// stops at the first positional, so we collect it and keep parsing.
+// Everything after a literal "--" is positional. Returns the positionals.
+func parse(fs *flag.FlagSet, args []string) ([]string, error) {
+	var pos, trailing []string
+	for i, a := range args {
+		if a == "--" {
+			trailing = args[i+1:]
+			args = args[:i]
+			break
 		}
-		return usageError{err}
 	}
-	return nil
+	for {
+		if err := fs.Parse(args); err != nil {
+			if errors.Is(err, flag.ErrHelp) {
+				return nil, flag.ErrHelp
+			}
+			return nil, usageError{err}
+		}
+		rest := fs.Args()
+		if len(rest) == 0 {
+			return append(pos, trailing...), nil
+		}
+		// rest[0] is a positional; keep parsing what follows as flags.
+		pos = append(pos, rest[0])
+		args = rest[1:]
+	}
 }

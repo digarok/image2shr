@@ -290,6 +290,24 @@ func TestPreviewAndInspect(t *testing.T) {
 	}
 }
 
+// TestFlagsAfterPositional pins the spec's canonical usage: flags may
+// follow the positional argument ("image2shr preview file.shr -o out.png").
+func TestFlagsAfterPositional(t *testing.T) {
+	in := testPNG(t)
+	dir := t.TempDir()
+	out := filepath.Join(dir, "out.shr")
+	if code, _, stderr := run(t, nil, "convert", in, "-o", out, "--dither", "none"); code != 0 {
+		t.Fatalf("convert with trailing flags: exit %d, stderr: %s", code, stderr)
+	}
+	pngOut := filepath.Join(dir, "out.png")
+	if code, _, stderr := run(t, nil, "preview", out, "-o", pngOut, "--scale", "2"); code != 0 {
+		t.Fatalf("preview with trailing flags: exit %d, stderr: %s", code, stderr)
+	}
+	if _, err := os.Stat(pngOut); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPreviewRejectsBadFile(t *testing.T) {
 	bad := filepath.Join(t.TempDir(), "bad.shr")
 	if err := os.WriteFile(bad, []byte("hello"), 0o644); err != nil {

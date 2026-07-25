@@ -42,18 +42,19 @@ func cmdInspect(e *env, args []string) error {
 	fs := newFlagSet(e, "inspect", inspectUsage)
 	var asJSON bool
 	fs.BoolVar(&asJSON, "json", false, "machine-readable report on stdout")
-	if err := parse(fs, args); err != nil {
-		return err
-	}
-	if fs.NArg() != 1 {
-		return usagef("inspect needs exactly one .shr file; see --help")
-	}
-
-	frame, err := readFrame(e, fs.Arg(0))
+	pos, err := parse(fs, args)
 	if err != nil {
 		return err
 	}
-	rep := inspectFrame(fs.Arg(0), frame)
+	if len(pos) != 1 {
+		return usagef("inspect needs exactly one .shr file; see --help")
+	}
+
+	frame, err := readFrame(e, pos[0])
+	if err != nil {
+		return err
+	}
+	rep := inspectFrame(pos[0], frame)
 
 	if asJSON {
 		return writeJSON(e.stdout, rep)

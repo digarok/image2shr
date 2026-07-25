@@ -84,13 +84,14 @@ func cmdConvert(e *env, args []string) error {
 	fs.BoolVar(&cfg.Quiet, "quiet", false, "suppress warnings on stderr")
 	fs.BoolVar(&cfg.Quiet, "q", false, "alias for --quiet")
 
-	if err := parse(fs, args); err != nil {
+	pos, err := parse(fs, args)
+	if err != nil {
 		return err
 	}
-	if fs.NArg() != 1 {
-		return usagef("convert needs exactly one input file (got %d); see --help", fs.NArg())
+	if len(pos) != 1 {
+		return usagef("convert needs exactly one input file (got %d); see --help", len(pos))
 	}
-	cfg.Input = fs.Arg(0)
+	cfg.Input = pos[0]
 
 	if cropSpec != "" {
 		var c pipeline.CropRect
