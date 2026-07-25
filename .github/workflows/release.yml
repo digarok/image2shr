@@ -1,0 +1,44 @@
+# Publishes a GitHub release with cross-compiled binaries whenever a v* tag
+# is pushed. Uses only first-party actions and the runner's gh CLI.
+name: release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history so `git describe --tags` in the Makefile resolves
+          # the version baked into the binaries.
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Test
+        run: make test
+
+      - name: Lint
+        run: make lint
+
+      - name: Cross-compile
+        run: make cross
+
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "image2shr $GITHUB_REF_NAME" \
+            --generate-notes
