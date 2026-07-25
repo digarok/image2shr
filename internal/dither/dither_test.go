@@ -64,6 +64,26 @@ func TestNoneNearestGrey(t *testing.T) {
 	}
 }
 
+// TestNearestIsPerceptual pins the matching metric. A mid-tone grey sits
+// close to black in linear light (0.2 linear displays as ~sRGB 0.48), so
+// linear-distance matching flips it to black — the black-speckle-on-white
+// artifact. Perceptually it is near the middle and must go to white here.
+func TestNearestIsPerceptual(t *testing.T) {
+	var plan pipeline.Plan
+	for i := range plan.Palettes[0] {
+		plan.Palettes[0][i] = shr.RGB12{R: 15, G: 15, B: 15}
+	}
+	plan.Palettes[0][0] = shr.RGB12{} // black + white only
+	d, _ := pipeline.LookupDitherer("none")
+	out, err := d.Apply(flat(0.2), plan, pipeline.DefaultOptions())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Pix[0] == 0 {
+		t.Error("linear 0.2 (sRGB ~0.48) matched black, not white — matching is not perceptual")
+	}
+}
+
 func TestFloydSteinbergPreservesMeanLevel(t *testing.T) {
 	// A flat image exactly between grey levels 7 and 8 (in linear light)
 	// must dither to a mix of 7s and 8s whose mean linear value stays close
